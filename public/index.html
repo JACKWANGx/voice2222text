@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice2Text - 语音转文字</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+    .container { max-width: 800px; margin: 0 auto; padding: 2rem 1rem; }
+    h1 { text-align: center; font-size: 2rem; margin-bottom: 0.5rem; }
+    h1 span { background: linear-gradient(135deg, #38bdf8, #818cf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .subtitle { text-align: center; color: #94a3b8; margin-bottom: 2rem; }
+    .card { background: #1e293b; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid #334155; }
+    .card h2 { font-size: 1.1rem; margin-bottom: 1rem; color: #38bdf8; }
+    label { display: block; font-size: 0.9rem; color: #94a3b8; margin-bottom: 0.4rem; }
+    select, input[type="text"] { width: 100%; padding: 0.6rem 0.8rem; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: #e2e8f0; font-size: 0.95rem; outline: none; }
+    select:focus, input:focus { border-color: #38bdf8; }
+    .row { display: flex; gap: 1rem; }
+    .row > * { flex: 1; }
+    .drop-zone { border: 2px dashed #475569; border-radius: 12px; padding: 2rem; text-align: center; cursor: pointer; transition: all 0.3s; }
+    .drop-zone:hover, .drop-zone.dragover { border-color: #38bdf8; background: rgba(56,189,248,0.05); }
+    .drop-zone p { color: #94a3b8; margin-top: 0.5rem; }
+    .drop-zone .icon { font-size: 2.5rem; }
+    #fileInput { display: none; }
+    .file-info { display: flex; align-items: center; gap: 0.8rem; padding: 0.8rem; background: #0f172a; border-radius: 8px; margin-top: 1rem; }
+    .file-info .name { flex: 1; font-size: 0.9rem; word-break: break-all; }
+    .file-info .size { color: #94a3b8; font-size: 0.8rem; }
+    .file-info .remove { color: #ef4444; cursor: pointer; font-size: 1.2rem; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.8rem 1.5rem; border: none; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+    .btn-primary { background: linear-gradient(135deg, #38bdf8, #818cf8); color: #0f172a; width: 100%; }
+    .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .result { margin-top: 1rem; }
+    .result textarea { width: 100%; min-height: 200px; padding: 1rem; background: #0f172a; border: 1px solid #475569; border-radius: 8px; color: #e2e8f0; font-size: 0.95rem; line-height: 1.6; resize: vertical; outline: none; }
+    .result textarea:focus { border-color: #38bdf8; }
+    .actions { display: flex; gap: 0.8rem; margin-top: 0.8rem; }
+    .btn-sm { padding: 0.5rem 1rem; font-size: 0.85rem; background: #334155; color: #e2e8f0; border-radius: 6px; border: none; cursor: pointer; }
+    .btn-sm:hover { background: #475569; }
+    .status { text-align: center; padding: 1rem; color: #94a3b8; }
+    .status.processing { color: #38bdf8; }
+    .status.error { color: #ef4444; }
+    .spinner { display: inline-block; width: 1rem; height: 1rem; border: 2px solid #38bdf8; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 0.5rem; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .provider-info { font-size: 0.8rem; color: #64748b; margin-top: 0.3rem; }
+    footer { text-align: center; color: #475569; font-size: 0.8rem; margin-top: 2rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1><span>Voice2Text</span></h1>
+    <p class="subtitle">上传音频文件，一键转文字 | 支持多家 ASR 服务</p>
+
+    <div class="card">
+      <h2>⚙️ ASR 服务配置</h2>
+      <div class="row">
+        <div>
+          <label>服务供应商</label>
+          <select id="provider">
+            <option value="tencent">腾讯云 ASR</option>
+            <option value="aliyun">阿里云 ASR</option>
+            <option value="openai">OpenAI Whisper</option>
+          </select>
+          <div class="provider-info" id="providerInfo">新客免费额度：5小时录音 + 5000次调用</div>
+        </div>
+        <div>
+          <label>识别语言</label>
+          <select id="lang">
+            <option value="zh">中文</option>
+            <option value="en">英文</option>
+            <option value="zh_en">中英混合</option>
+            <option value="ja">日文</option>
+            <option value="ko">韩文</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📁 上传音频</h2>
+      <div class="drop-zone" id="dropZone">
+        <div class="icon">🎙️</div>
+        <p>拖拽音频文件到此处，或点击选择文件</p>
+        <p style="font-size:0.8rem;color:#64748b">支持 mp3 / wav / m4a / flac / ogg，最大 25MB</p>
+      </div>
+      <input type="file" id="fileInput" accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg">
+      <div id="fileInfo" style="display:none" class="file-info">
+        <span class="name" id="fileName"></span>
+        <span class="size" id="fileSize"></span>
+        <span class="remove" id="fileRemove">✕</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🚀 开始转写</h2>
+      <button class="btn btn-primary" id="transcribeBtn" disabled>
+        开始语音转文字
+      </button>
+      <div class="status" id="status"></div>
+      <div class="result" id="resultArea" style="display:none">
+        <label>转写结果</label>
+        <textarea id="resultText" readonly></textarea>
+        <div class="actions">
+          <button class="btn-sm" id="copyBtn">📋 复制文字</button>
+          <button class="btn-sm" id="downloadBtn">⬇ 下载 TXT</button>
+        </div>
+      </div>
+    </div>
+
+    <footer>voice2222text.xyz | Cloudflare Workers 驱动</footer>
+  </div>
+
+  <script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const fileInfo = document.getElementById('fileInfo');
+    const fileName = document.getElementById('fileName');
+    const fileSize = document.getElementById('fileSize');
+    const fileRemove = document.getElementById('fileRemove');
+    const transcribeBtn = document.getElementById('transcribeBtn');
+    const status = document.getElementById('status');
+    const resultArea = document.getElementById('resultArea');
+    const resultText = document.getElementById('resultText');
+    const provider = document.getElementById('provider');
+    const lang = document.getElementById('lang');
+    const providerInfo = document.getElementById('providerInfo');
+
+    const providerDescriptions = {
+      tencent: '新客免费额度：5小时录音 + 5000次调用',
+      aliyun: '新用户有免费额度，支持22种方言+30种语言',
+      openai: '$0.006/分钟，支持多语言，质量优秀'
+    };
+
+    let selectedFile = null;
+
+    provider.addEventListener('change', () => {
+      providerInfo.textContent = providerDescriptions[provider.value] || '';
+    });
+
+    dropZone.addEventListener('click', () => fileInput.click());
+    dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('dragover');
+      if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+
+    fileInput.addEventListener('change', () => { if (fileInput.files.length) handleFile(fileInput.files[0]); });
+    fileRemove.addEventListener('click', () => {
+      selectedFile = null;
+      fileInfo.style.display = 'none';
+      transcribeBtn.disabled = true;
+      fileInput.value = '';
+    });
+
+    function handleFile(file) {
+      const validTypes = ['audio/mpeg', 'audio/wav', 'audio/x-wav', 'audio/mp4', 'audio/x-m4a', 'audio/flac', 'audio/ogg', 'audio/webm'];
+      const validExts = ['.mp3', '.wav', '.m4a', '.flac', '.ogg'];
+      const ext = '.' + file.name.split('.').pop().toLowerCase();
+      if (!validTypes.includes(file.type) && !validExts.includes(ext)) {
+        alert('不支持的文件格式，请上传音频文件');
+        return;
+      }
+      if (file.size > 25 * 1024 * 1024) {
+        alert('文件大小超过 25MB 限制');
+        return;
+      }
+      selectedFile = file;
+      fileName.textContent = file.name;
+      fileSize.textContent = formatSize(file.size);
+      fileInfo.style.display = 'flex';
+      transcribeBtn.disabled = false;
+    }
+
+    function formatSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    transcribeBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+      transcribeBtn.disabled = true;
+      resultArea.style.display = 'none';
+      status.className = 'status processing';
+      status.innerHTML = '<span class="spinner"></span>正在上传并转写，请稍候...';
+
+      const formData = new FormData();
+      formData.append('audio', selectedFile);
+      formData.append('provider', provider.value);
+      formData.append('lang', lang.value);
+
+      try {
+        const resp = await fetch('/api/transcribe', { method: 'POST', body: formData });
+        const data = await resp.json();
+        if (data.error) {
+          status.className = 'status error';
+          status.textContent = '❌ ' + data.error;
+        } else {
+          status.className = 'status';
+          status.textContent = '✅ 转写完成！';
+          resultText.value = data.text;
+          resultArea.style.display = 'block';
+        }
+      } catch (err) {
+        status.className = 'status error';
+        status.textContent = '❌ 网络错误：' + err.message;
+      }
+      transcribeBtn.disabled = false;
+    });
+
+    document.getElementById('copyBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(resultText.value).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.textContent = '✅ 已复制';
+        setTimeout(() => btn.textContent = '📋 复制文字', 2000);
+      });
+    });
+
+    document.getElementById('downloadBtn').addEventListener('click', () => {
+      const blob = new Blob([resultText.value], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (selectedFile ? selectedFile.name.replace(/\.[^.]+$/, '') : 'transcript') + '.txt';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
