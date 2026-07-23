@@ -85,7 +85,7 @@ async function transcribeTencent(audioBuffer, fileName, lang, env) {
   const body = JSON.stringify({
     ProjectId: 0,
     SubServiceType: 1,
-    EngSerViceType: '1',
+    EngSerViceType: '16',
     SourceType: 1,
     VoiceFormat: ext,
     Data: audioBase64,
