@@ -79,7 +79,7 @@ async function transcribeTencent(audioBuffer, fileName, lang, env) {
   const action = 'SentenceRecognition';
   const version = '2019-06-14';
 
-  const audioBase64 = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+  const audioBase64 = arrayBufferToBase64(audioBuffer);
   const ext = getExt(fileName) || 'wav';
 
   const body = JSON.stringify({
@@ -145,7 +145,7 @@ async function transcribeAliyun(audioBuffer, fileName, lang, env) {
   // 获取阿里云 NLS Token
   const token = await getAliyunToken(accessKeyId, accessKeySecret);
 
-  const audioBase64 = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+  const audioBase64 = arrayBufferToBase64(audioBuffer);
   const ext = getExt(fileName) || 'wav';
 
   const body = JSON.stringify({
@@ -224,6 +224,20 @@ function getExt(filename) {
   if (!filename) return '';
   const parts = filename.split('.');
   return parts.length > 1 ? parts.pop().toLowerCase() : '';
+}
+
+/**
+ * ArrayBuffer → Base64（分块处理，避免栈溢出）
+ */
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 8192;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk);
+  }
+  return btoa(binary);
 }
 
 async function sha256Hex(str) {
