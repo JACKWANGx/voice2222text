@@ -5,8 +5,6 @@
  * API 密钥通过 Cloudflare Pages 环境变量注入
  */
 
-import crypto from 'crypto';
-
 export async function onRequest(context) {
   const { request, env } = context;
 
